@@ -1,0 +1,103 @@
+---
+title: "Merging clean datasets"
+author: Pau Grau
+date: 23 de desembre de 2019
+output: html_document
+
+---
+```{r}
+if (!require(repmis)) { install.packages(repmis); library(repmis) } 
+if (!require(httr)) { install.packages(httr); library(httr) } 
+if (!require(readr)) { install.packages(readr); library(readr) } 
+if (!require(dplyr)) { install.packages(dplyr); library(dplyr) } 
+if (!require(tidyverse)) { install.packages(tidyverse); library(tidyverse) } 
+
+```
+CLEAN CLEA
+Keep only district information (not party). Remove cases older than 1945. Build variance (varmag), SD(sdmag) and mean(memag) magnitude.
+```{r}
+load("C:/Users/Pau Grau/Desktop/clea_lc_20190617.rdata")
+clea <- select(clea_lc_20190617, 1:11)
+head(clea)
+clea<-clea %>% distinct() 
+head(clea)
+
+clea <- subset(clea, clea$yr>1945)
+clea$mag[clea$mag<0] <- "."
+
+clea <- select(clea, -1:-2)
+head(clea)
+
+clea$mag <- as.numeric(as.character(clea$mag))
+
+var <- aggregate(clea$mag,by=data.frame(clea$ctr,clea$ctr_n, clea$yr, clea$mn), var, na.rm=TRUE)
+
+mean <- aggregate(clea$mag,by=data.frame(clea$ctr,clea$ctr_n, clea$yr, clea$mn), mean, na.rm=TRUE)
+
+clea1 <- merge(mean,var, by=c("clea.yr", "clea.ctr", "clea.mn"))
+
+clea1 <- select(clea1, -6)
+clea1$varmag <- as.numeric(as.character(clea1$x.y))
+clea1$sdmag <- sqrt(clea1$varmag)
+clea1$memag <- as.numeric(as.character(clea1$x.x))
+
+clea1 <- select(clea1, -5:-6)
+clea1$UN <- clea1$clea.ctr
+clea1$country <- clea1$clea.ctr_n.x
+clea1$year <- clea1$clea.yr
+clea1$month <- clea1$clea.mn
+clea1<- clea1[,-1:-4]
+
+write.csv2(clea1, file="clea1.csv")
+```
+
+
+IMPORT DATA AND EXPORT THEM AS CSV
+```{r}
+library(haven)
+AlesinaCOW <- read_dta("C:/Users/Pau Grau/Downloads/Alesina+COW (2).dta")
+AlesinaCOW <- AlesinaCOW[-c(216:1085), ]
+AlesinaCOW$UN <- countrycode::countrycode(AlesinaCOW$country, "country.name", "un")
+AlesinaCOW$cow <- countrycode::countrycode(AlesinaCOW$country, "country.name", "cown")
+
+write.csv2(AlesinaCOW, file="AlesinaCowUN.csv")
+```
+MANUALLY UPLOADED TO GITHUB."https://github.com/pgrau7/ES-0/blob/master"
+
+```{r}
+alesina <- readr::read_csv2(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/AlesinaCowUN.csv"))
+
+golder <- read.csv(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/es_data-v3.csv"))
+
+clea <- readr::read_csv2(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/clea1.csv"))
+```
+UPLOAD COW TO UN, which has more codes.
+```{r}
+alesina$UN <- countrycode::countrycode(alesina$country, "country.name", "un")
+golder$country <- as.character(golder$country)
+golder$UN <- countrycode::countrycode(golder$country, "country.name", "un")
+clea$country <- as.character(clea$country)
+clea$UN <- countrycode::countrycode(clea$country, "country.name", "un")
+```
+
+Golder is Base. I should delete presidential elections (as it might be problematic when merging, for having two elections in the same year/country).
+```{r}
+golder <- subset(golder, !(presidential == "1"))
+```
+
+- Add CLEA
+```{r}
+golder$country <- as.character(golder$country)
+clea$country <- as.character(clea$country)
+
+golderclea1 <- merge(golder,clea,by=c("UN", "year", "month"))
+```
+- Add Alesina
+```{r}
+goldercleaalesina <- merge(golderclea1, alesina, by=c("UN"))
+```
+EXPORT
+```{r}
+write.csv2(goldercleaalesina, file="FINAL_DATA.csv")
+```
+
