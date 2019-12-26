@@ -1,0 +1,149 @@
+---
+title: "Merging clean datasets"
+author: Pau Grau
+date: 23 de desembre de 2019
+output: html_document
+
+---
+
+#Load packages
+```{r}
+if (!require(repmis)) { install.packages(repmis); library(repmis) } 
+if (!require(httr)) { install.packages(httr); library(httr) } 
+if (!require(readr)) { install.packages(readr); library(readr) } 
+if (!require(dplyr)) { install.packages(dplyr); library(dplyr) } 
+if (!require(tidyverse)) { install.packages(tidyverse); library(tidyverse) } 
+if (!require(countrycode)) { install.packages(countrycode); library(countrycode) } 
+if (!require(haven)) { install.packages(haven); library(haven) } 
+
+
+
+```
+# Clean CLEA
+Keep only district information (not party). Remove cases older than 1945. Build variance (varmag), SD(sdmag) and mean(memag) magnitude.
+```{r}
+load("C:/Users/Pau Grau/Desktop/clea_lc_20190617.rdata")
+clea <- select(clea_lc_20190617, 1:11)
+head(clea)
+clea<-clea %>% distinct() 
+head(clea)
+
+clea <- subset(clea, clea$yr>1945)
+clea$mag[clea$mag<0] <- "."
+
+clea <- select(clea, -1:-2)
+head(clea)
+
+clea$mag <- as.numeric(as.character(clea$mag))
+
+var <- aggregate(clea$mag,by=data.frame(clea$ctr,clea$ctr_n, clea$yr, clea$mn), var, na.rm=TRUE)
+
+mean <- aggregate(clea$mag,by=data.frame(clea$ctr,clea$ctr_n, clea$yr, clea$mn), mean, na.rm=TRUE)
+
+clea1 <- merge(mean,var, by=c("clea.yr", "clea.ctr", "clea.mn"))
+
+clea1 <- select(clea1, -6)
+clea1$varmag <- as.numeric(as.character(clea1$x.y))
+clea1$sdmag <- sqrt(clea1$varmag)
+clea1$memag <- as.numeric(as.character(clea1$x.x))
+
+clea1 <- select(clea1, -5:-6)
+clea1$UN <- clea1$clea.ctr
+clea1$country <- clea1$clea.ctr_n.x
+clea1$year <- clea1$clea.yr
+clea1$month <- clea1$clea.mn
+clea1<- clea1[,-1:-4]
+
+write.csv2(clea1, file="clea1.csv")
+```
+# Import data and export them as csv in a unified format
+
+```{r}
+library(haven)
+AlesinaCOW <- read_dta("C:/Users/Pau Grau/Downloads/Alesina+COW (2).dta")
+AlesinaCOW <- AlesinaCOW[-c(216:1085), ]
+AlesinaCOW$UN <- countrycode::countrycode(AlesinaCOW$country, "country.name", "un")
+AlesinaCOW$cow <- countrycode::countrycode(AlesinaCOW$country, "country.name", "cown")
+
+write.csv2(AlesinaCOW, file="AlesinaCowUN.csv")
+```
+
+# Download data from github
+MANUALLY UPLOADED TO GITHUB."https://github.com/pgrau7/ES-0/blob/master"
+```{r}
+alesina <- readr::read_csv2(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/Merging datasets/AlesinaCowUN.csv"))
+
+golder <- read.csv(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/Merging datasets/es_data-v3.csv"))
+
+clea <- readr::read_csv2(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/Merging datasets/clea1.csv"))
+```
+UPLOAD COW TO UN, which has more codes.
+```{r}
+alesina$UN <- countrycode::countrycode(alesina$country, "country.name", "un")
+golder$country <- as.character(golder$country)
+golder$UN <- countrycode::countrycode(golder$country, "country.name", "un")
+clea$country <- as.character(clea$country)
+clea$UN <- countrycode::countrycode(clea$country, "country.name", "un")
+```
+
+Golder is Base. I should delete presidential elections (as it might be problematic when merging, for having two elections in the same year/country).
+```{r}
+golder <- subset(golder, !(presidential == "1"))
+```
+
+- Add CLEA
+```{r}
+golder$country <- as.character(golder$country)
+clea$country <- as.character(clea$country)
+
+golderclea1 <- merge(golder,clea,by=c("UN", "year", "month"))
+```
+- Add Alesina
+```{r}
+goldercleaalesina <- merge(golderclea1, alesina, by=c("UN"))
+```
+EXPORT (and upload manually)
+```{r}
+write.csv2(goldercleaalesina, file="FINAL_DATA.csv")
+```
+
+# Create the clean dataset
+Import dataset from https://raw.githubusercontent.com/pgrau7/ES-0/master/FINAL_DATA.csv.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mydata <- read_csv2(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/Merging datasets/FINAL_DATA.csv"))
+mydata$EthAl <- as.numeric(mydata$EthAl)
+```
+Select our variables and build a reduced dataset.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+myvars <- c("country.x","year", "month","elec_id", "enep", "seats", "memag", "varmag", "EthAl", "uppertier")
+myvars1 <- c("enep", "seats", "memag", "varmag", "EthAl", "uppertier")
+newdata <- mydata[myvars]
+```
+
+###Preliminar Formatting
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+newdata$enep[mydata$enep==-99] <- NA
+newdata$uppertier[mydata$uppertier==-99] <- NA
+
+newdata$upperseats <- as.numeric(mydata$upperseats)
+newdata$upperseats[mydata$upperseats==-99] <- NA
+```
+
+###Bivariant statistics
+To do it, I'll use GGplot2 and GGally^[John W Emerson, Walton A Green, Barret Schloerke, Jason Crowley, Dianne Cook, Heike Hofmann, Hadley Wickham. The Generalized Pairs Plot. Journal of Computational and Graphical Statistics, vol. 22, no. 1, pp. 79-91, 2012.]. This plot allows us to see that memag, marmag and uppertier are highly skewed to the left. 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+GGally::ggpairs(newdata[,-1:-4], title="Bivariant descriptive statistics")
+```
+In order to meet the normality assumption needed in regressions, we will log1p-transform these variables. As we have many zeros, we will make the logarithm of x+1.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+attach(newdata)
+newdata$logenep <- log1p(enep)
+newdata$logseats <- log1p(seats)
+newdata$logmemag <- log1p(memag)
+newdata$logvarmag <- log1p(varmag)
+newdata$logethal <- log1p(EthAl)
+newdata$loguppertier <- log1p(uppertier)
+newdata$logupperseats <- log1p(upperseats)
+
+GGally::ggpairs(newdata[,-1:-11], title="Bivariant descriptive statistics with loglog1p-transformed data")
+```
