@@ -1,13 +1,13 @@
 # ES-0
 First repository. ES demo.
 
-##Files:
+## Files:
 
 1. Rmarkdown for cleaning and merging the three original datasets, as well as the cleaned, definitive data.
 
 2. Rmarkdown of regressions
 
-##References
+## References
 
 Alesina, A., Devleeschauwer, A., Kurlat, S., & Wacziarg, R. (2003). Fractionalization. Journal of Economic Growth, 8, 155-194.
 
