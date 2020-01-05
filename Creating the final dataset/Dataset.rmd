@@ -1,0 +1,96 @@
+---
+title: "Dataset construction"
+author: "Pau Grau"
+date: "5 gener de 2020"
+output: html_document
+---
+#Constructing the database
+The paper takes the data from Clark & Golder (2006) as the main source. However, we included variables from Alesina et al. (2003) and Constituency-Level Elections Archive (CLEA). This document provides the necessary scripts to extract with "R" the variables from their original fonts. The variables have been merged with the main dataset through STATA (dofile available as "legislativenewDOFILE.do"). The resulting data from this script was uploaded to the Github repository in .dta  format (alesina.dta and clea1.dta) in order to make easier the process of merging. 
+
+#Load packages
+```{r}
+if (!require(repmis)) { install.packages(repmis); library(repmis) } 
+if (!require(httr)) { install.packages(httr); library(httr) } 
+if (!require(readr)) { install.packages(readr); library(readr) } 
+if (!require(dplyr)) { install.packages(dplyr); library(dplyr) } 
+if (!require(tidyverse)) { install.packages(tidyverse); library(tidyverse) } 
+if (!require(countrycode)) { install.packages(countrycode); library(countrycode) } 
+if (!require(haven)) { install.packages(haven); library(haven) } 
+```
+
+#Constituency-Level Elections Archive
+The following script loads the dataset (previously manually downloaded from CLEA website^[http://www.electiondataarchive.org/clea-lower-chamber-elections-archive.php] ), aggregates the data and exports in .dta and .csv a file with ID variables as well as "Average District Magnitude" (memag), "Variance in District Magnitudes" (varmag) and "Standard Deviation in District Magnitudes" (sdmag). The resulting file is named "clea1".
+```{r}
+load("C:/Users/Pau Grau/Desktop/clea_lc_20190617.rdata")
+clea <- select(clea_lc_20190617, 1:11)
+head(clea)
+clea<-clea %>% distinct() 
+head(clea)
+
+clea <- subset(clea, clea$yr>1945)
+clea$mag[clea$mag<0] <- "NA"
+
+clea <- select(clea, -1:-2)
+head(clea)
+
+clea$mag <- as.numeric(as.character(clea$mag))
+var <- aggregate(clea$mag,by=data.frame(clea$ctr,clea$ctr_n, clea$yr, clea$mn), var, na.rm=TRUE)
+
+mean <- aggregate(clea$mag,by=data.frame(clea$ctr,clea$ctr_n, clea$yr, clea$mn), mean, na.rm=TRUE)
+
+clea1 <- merge(mean,var, by=c("clea.yr", "clea.ctr", "clea.mn"))
+
+clea1 <- select(clea1, -6)
+clea1$varmag <- as.numeric(as.character(clea1$x.y))
+clea1$sdmag <- sqrt(clea1$varmag)
+clea1$memag <- as.numeric(as.character(clea1$x.x))
+
+clea1 <- select(clea1, -5:-6)
+clea1$UN <- clea1$clea.ctr
+clea1$country <- clea1$clea.ctr_n.x
+clea1$year <- clea1$clea.yr
+clea1$month <- clea1$clea.mn
+clea1<- clea1[,-1:-4]
+
+clea1$country <- as.character(clea1$country)
+clea1$country <- countrycode::countrycode(clea1$country, "country.name", "country.name")
+
+clea1<-clea1[!is.na(clea1$varmag)&!is.na(clea1$sdmag)&!is.na(clea1$memag),]
+
+n_occur <- data.frame(table(clea1$year, clea1$country))
+n_occur[n_occur$Freq > 1,]
+
+#     Var1           Var2 Freq
+#2548 2011  C??te d???Ivoire    2
+#4566 1985          India    2
+#4577 1996          India    2
+#5097 2005          Japan    2
+#5669 1993  Liechtenstein    2
+#6122 2008       Malaysia    2
+#8483 1960      Sri Lanka    2
+#9487 2015         Turkey    2
+#9811 1974 United Kingdom    2
+#I can remove duplicates since they have the same values.
+
+clea1 <- clea1[,-7]
+clea1<-clea1 %>% distinct() 
+
+write.csv(clea1, "clea1.csv")
+write_dta(clea1, path="clea1.dta")
+```
+
+#Alesina
+The following script builds a single file with data from Alesina^[https://www.anderson.ucla.edu/faculty_pages/romain.wacziarg/downloads/2003_fractionalization.xls] with the variables "country", "date" (when the data was collected), and "EthAl" (The value of Alesina's ethnic fractionalization).
+```{r}
+library(readxl)
+alesina <- read_excel("C:/Users/Pau Grau/Downloads/2003_fractionalization.xls")
+alesina$"1"[131] <- "Federated States of Micronesia"
+alesina <- alesina[-c(1,2, 218:220), ]
+alesina$country <- countrycode::countrycode(alesina$"1", "country.name", "country.name")
+alesina$date <- alesina$"3"
+alesina$EthAl <- as.numeric(alesina$"4")
+alesina <- alesina[c("country", "date", "EthAl") ]
+
+write.csv(alesina, "alesina")
+write_dta(alesina, path = "alesina.dta")
+```
