@@ -1,11 +1,10 @@
 # ES-0
 First repository. ES demo.
 
-## Files:
+## Folders:
 
-1. Rmarkdown for cleaning and merging the three original datasets, as well as the cleaned, definitive data.
+1. "Creating the final dataset": provides the new variables with ID variables (alesina.dta, clea1.dta, Legislative_new1.dta) as well as the ".rmd" file (Dataset.rmd) for building through the R statistical software these unified datasets from their original sources. The final dataset is "LegisCLEAN.dta"
 
-2. Rmarkdown of regressions
 
 ## References
 
