@@ -1,5 +1,5 @@
 # ES-0
-First repository. ES demo.
+This repository includes all the necessary material for replicating the paper "", written by Pau Grau for the course Electoral Systems taught by Ignacio Lago at the MA of Research in Political Science at UPF (2019-2020).
 
 ## Folders:
 
