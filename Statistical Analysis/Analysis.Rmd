@@ -1,12 +1,15 @@
 ---
-title: "R Notebook"
+title: "Analysis"
 output:
-  html_document
+  html_document:
+    toc: true
+    toc_depth: 2
 ---
 
 #Import Golder(+alesina+CLEA)
-This file has been merged through STATA "legnewDOFILE.do" dofile. 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+This file has been merged through STATA "legnewDOFILE.do" dofile, the resulting filo of which is available at "https://github.com/pgrau7/ES-0/blob/master/Creating%20the%20final%20dataset/LegisCLEAN.dta?raw=true" as a .dta file.
+
+```{r Importing Packages, message=FALSE, warning=FALSE, include=FALSE}
 if (!require(backports)) { install.packages("backports"); library(backports) } 
 if (!require(haven)) { install.packages("haven"); library(haven) } 
 if (!require(bibtex)) { install.packages("bibtex"); library(bibtex) } 
@@ -41,15 +44,16 @@ data <- read_dta("https://github.com/pgrau7/ES-0/blob/master/Creating%20the%20fi
 #Regressions replication
 ##Descriptive Statistics
 
-```{r}
-myvars <- c("enep1", "eneg", "EthAl", "memag", "logmag", "uppertier", "enpres", "proximity1", "uppertier_ethal")
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=TRUE}
+myvars <- c("enep1", "eneg", "EthAl", "memag", "logmag", "uppertier", "enpres", "proximity1", "uppertier_ethal", "varmag")
 data1 <- data[myvars]
-pairs(data1)
+
+#GGally::ggpairs(data1)
 ```
-There are many 0's! There's linear or almost linear relationship on many variables, but the 0's distort them. Can I treat them as NA?. How to deal with many 0s in one variable? 
+Most of the varibles have a highly skewed distribution. It isn't a problem as long as the residuals of the regression models are normal. 
 
 ###Testing Ethnic Fractionalization
-```{r}
+```{r Ethnic Fractionalization, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 par(family="serif",bty="l",mar=c(5,5.5,2,2))
 scatter.smooth(data$EthAl, data$eneg, main="Scatterplot between Fearon and Alesina ethnic fragmentation (C&G2006 data)", xlab = "Alesina", ylab = "Fearon")
 scatter.smooth(data$EthAl, log(data$eneg), main="Scatterplot between Fearon and Alesina ethnic fragmentation (C&G2006 data)", xlab = "Alesina", ylab = "log(Fearon)")
@@ -77,7 +81,7 @@ CS1OAL <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+upperti
 ```{r results='asis'}
 stargazer::stargazer(CS1, CS1AL, CS1O, CS1OAL, type="html", dep.var.caption  = "Clark&Golder 2006 analysis replication: Fearon vs. Alesina",  column.labels = c("1990s Whole Sample (Fearon)","1990s Whole Sample (Alesina)", "1990s Established Democracies (Fearon)", "1990s Established Democracies (Alesina)"))
 ```
-From these results, Alesina's measure seems to fit well the models:
+We have succeded in reproducing Clark & Golder (2006) models. From these results, Alesina's measure seems to fit well the models:
 
 - It has a higher number of observations in the dataset
 
@@ -93,6 +97,7 @@ plot(CS1AL)+theme_bw()
 olsrr::ols_test_normality(CS1AL)
 leveragePlots(CS1AL)
 ```
+
 - Normality of Residuals: We fail to reject no linearity (significant at p<0.05 in Shapiro-Wilk and at p<0.1 at Kolmogorov-Smirnov). Observation 13 (Argentina 1954) is an outlier. 
 
 - Heteroskedasticity: Breusch-Pagan test (bptest) has a value of BP = 13.936, df = 8, p-value = 0.08344. We fail to reject homoskedasticity at a 95% level. 
@@ -105,27 +110,29 @@ bptest(CS1AL)
 vif(CS1AL)
 ```
 
-```{r echo=FALSE}
+```{r LogCS1AL, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#Normalizing the variables through log(x+1) -as much of them have a lot of 0 values- don't improve the model in terms of R2 and adjustd R2.  
+
+
 #lgCS1AL<-lm(log1p(enep1)~log1p(EthAl)+log1p(memag)+log1p(uppertier)+log1p(enpres)+proximity1+log1p(memag)*log1p(EthAl)+log1p(uppertier)*log1p(EthAl)+proximity1*log1p(enpres), data=subset(data, nineties==1))
 #summary(lgCS1AL)
 ```
 
 ```{r echo=FALSE}
+#The data is still not normal (skewness & kurtosis) but we have solved heteroskedasticity.
 #autoplot(lgCS1AL)+theme_bw()
 #gvlma.form(lgCS1AL, data=data)
-#The data is still not normal (skewness & kurtosis) but we have solved heteroskedasticity. 
 ```
 Even though the sample is small, we have not found evidence that OLS assumptions have been violated. 
 
 
 ##Pooled model
 In order to have a more extensive sample, CG2006 included all observations of the dataset in the analysis. As it is panel data with different observations per each country (in different dates), an OLS model would have heteroskedasticity, which can be addressed by treating panel data as such:
- - Breusch-Pagan test: BP = 49.255, df = 8, p-value = 5.682e-08
-```{r}
+- Breusch-Pagan test: BP = 49.255, df = 8, p-value = 5.682e-08
+```{r echo=TRUE}
 WS <- lm(log(enep1)~eneg+logmag+uppertier+enpres+proximity1+logmag_eneg+uppertier_eneg+proximity1_enpres, data=data)
 bptest(WS)
 ```
-
 Let's pool the data, then. As we had done in the OLS model, we will reply C&G2006's models (1946-1990 whole sample and 1946-1990 excluding countries that transitioned to democracy after 1989). As the authors replaced with NA the values of the variable "year" in those whith repeated elections, we will drop them from the analysis.
 ```{r}
 data1 <- data
@@ -133,10 +140,14 @@ data <- subset(data1, year!=".")
 ```
 
 Models:
- - poolWS: Pooled model. Whole sample. C&G(2006) model. 
- - poolWSAL: Pooled model. Whole sample. Alesina Ethnic Fractionalization (EthAl). C&G(2006) model. 
- - poolED: Pooled model. Established democracies. C&G(2006) model.
- - poolEDAL: Pooled model. Established democracies and Alesina Ethnic Fractionalization (EthAl). C&G(2006) model.
+
+- poolWS: Pooled model. Whole sample. C&G(2006) model. 
+- poolWSAL: Pooled model. Whole sample. Alesina Ethnic Fractionalization (EthAl). C&G(2006) model. 
+- poolED: Pooled model. Established democracies. C&G(2006) model.
+- poolEDAL: Pooled model. Established democracies and Alesina Ethnic Fractionalization (EthAl). C&G(2006) model.
+- EDAL: LM model. Established democracies and Alesina Ethnic Fractionalization (EthAl). C&G(2006) model. Heteroskedastic.
+
+In the table below, robust s.e. are clustered by country through a HC1 covariance matrix.
 
 ```{r warning=FALSE}
 poolWS <- plm(enep1~eneg+logmag+uppertier+enpres+proximity1+eneg*logmag+uppertier*eneg+proximity1*enpres, data=data, index=c("country"), model="pooling")
@@ -157,22 +168,29 @@ robust_seEDAL <- sqrt(diag(vcovHC(poolEDAL, type = "HC1")))
 EDAL <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres, data=subset(data, old==1))
 ```
 
-
-```{r results='asis'}
+```{r echo=FALSE, results='asis'}
 stargazer::stargazer(poolWS,poolWSAL, poolED,poolEDAL, type="html", dep.var.caption  = "Clark&Golder 2006 pooled analysis replication",  column.labels = c("1946 to 2000 ws pooled","1946 to 2000 ws pooled(alesina)", "1946 to 2000 EDP","1946 to 2000 EDP alesina" ), se=list(robust_seWS,robust_seWSAL, robust_seED, robust_seEDAL)) 
 ```
 
 Alesina has more values, we increase the df. 
 
 ##Genuine models
+
+Prior to adding variance, we will test the differences when using Fearon and Alesina in pooled models.
 ```{r results='asis'}
-stargazer::stargazer(poolED, poolEDAL, poologED, se=list(robust_seED, robust_seEDAL, robust_selogED), type="html", column.labels = c("Alesina", "Fearon", "Log(Fearon)"))
+stargazer::stargazer(poolED, poolEDAL, se=list(robust_seED, robust_seEDAL), type="html", column.labels = c("Alesina", "Fearon"))
 
 jtools::plot_summs(poolED, poolEDAL, scale = TRUE, robust = list(robust_seED ,robust_seEDAL), model.names = c("Fearon", "Alesina"))
 ```
 ##Add variance
+Finally, we introduce variance in both additive and interactive models. 
 
-```{r }
+- poolEDAL: Pooled model with s.e. clustered by country. Established Democracies.
+- poolEDAL1: Pooled model with s.e. clustered by country. Established Democracies whose value for variance is not missing.
+- poolEDALv: Pooled model with s.e. clustered by country. Established Democracies whose value for variance is not missing. Variance as an additive variable.
+- poolEDALvx: Pooled model with s.e. clustered by country. Established Democracies whose value for variance is not missing. Variance as a constitutional term of the interaction between variance and logmag.
+
+```{r message=FALSE, warning=FALSE}
 poolEDAL <- plm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres, data=subset(data, old==1), index=c("country"), model="pooling")
 robust_seEDAL <- sqrt(diag(vcovHC(poolEDAL, type = "HC1")))
 
@@ -199,15 +217,35 @@ lpoolEDALvx <- plm(log(enep1)~EthAl+logmag+uppertier+enpres+proximity1+logmag_et
 robust_selEDALvx <- sqrt(diag(vcovHC(lpoolEDALvx, type = "HC1")))
 ```
 
-```{r results='asis'}
+```{r echo=FALSE, results='asis'}
 stargazer::stargazer(poolEDAL, poolEDAL1, poolEDALv, poolEDALvx, type="html", dep.var.caption  = "Clark&Golder 2006 pooled analysis replication",  column.labels = c("1946 to 2000 ED","1946 to 2000 ED (reduced sample)", "additive model","interactive model", NULL ), se=list(robust_seEDAL ,robust_seEDAL1, robust_seEDALv, robust_seEDALvx, robust_seEDALvxe)) 
 ```
 
-Some observations:
- - Increasing R^2^ , both adjusted and not.
- - Significance for interactions is not relevant, we should plot the expected marginal effect (How?)
-```{r}
+```{r echo=FALSE}
 jtools::plot_summs(poolEDAL, poolEDAL1, poolEDALv, poolEDALvx, scale = TRUE, robust = list(robust_seEDAL ,robust_seEDAL1, robust_seEDALv, robust_seEDALvx, robust_seEDALvxe), model.names = c("1946 to 2000 ED","1946 to 2000 ED (reduced sample)", "additive model","interactive model", NULL ))
+```
+Some observations:
+
+ - Increasing R^2^ , both adjusted and not.
+ - Significance for interactions is not relevant, we should plot the expected marginal effect (in the next section).
+
+###Leverage Plots (partial effects)
+Allow to see which cases are more influential for each variable in each model. 
+```{r message=FALSE, warning=FALSE}
+EDAL <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres, data=subset(data, old==1))
+
+EDAL1 <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres, data=subset(data, old==1&!is.na(data$varmag)))
+
+EDALv <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+varmag, data=subset(data, old==1&!is.na(data$varmag)))
+
+EDALvx <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+varmag+varmag*logmag, data=subset(data, old==1&!is.na(data$varmag)))
+
+EDALlogvx <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+log1p(varmag)+log1p(varmag)*logmag, data=subset(data, old==1&!is.na(data$varmag)))
+
+leveragePlots(EDAL)
+leveragePlots(EDAL1)
+leveragePlots(EDALv)
+leveragePlots(EDALvx)
 ```
 
 ###Interactions
@@ -310,7 +348,7 @@ meplotbasic <- function(model,var1,var2,ci=.95,
 }
 ```
 
-```{r}
+```{r echo=FALSE, warning=FALSE}
 #ED
 par(mfrow=c(2,2))
 
@@ -344,25 +382,10 @@ meplotbasic(model=poolEDAL1,var1="enpres",var2="proximity1",xlab = "Proximity be
      main=" ",
      ci_lty=3,yint_lty=1,yint_col="grey")
 ```
-###Leverage Plots
-```{r}
-EDAL <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres, data=subset(data, old==1))
 
-EDAL1 <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres, data=subset(data, old==1&!is.na(data$varmag)))
+###Analyzing Models 4 and 5
 
-EDALv <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+varmag, data=subset(data, old==1&!is.na(data$varmag)))
-
-EDALvx <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+varmag+varmag*logmag, data=subset(data, old==1&!is.na(data$varmag)))
-
-EDALlogvx <- lm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+log1p(varmag)+log1p(varmag)*logmag, data=subset(data, old==1&!is.na(data$varmag)))
-
-leveragePlots(EDAL)
-leveragePlots(EDAL1)
-leveragePlots(EDALv)
-leveragePlots(EDALvx)
-```
-####Analyzing Models 4 and 5
-```{r}
+```{r echo=FALSE}
 par(family="serif",bty="l",mar=c(5,5.5,2,2))
 meplotbasic(model=poolEDALv,var1="EthAl",var2="logmag",xlab = "Average District Magnitude (log)", ci=.95,
      ylab = expression(frac(partialdiff*paste("ENEP"),
@@ -380,6 +403,7 @@ meplotbasic(model=poolEDALvx,var1="EthAl",var2="logmag",xlab = "Average District
 
 
 ###Residual Plots
+
 ```{r}
 par(mfrow=c(2,2))
 plot(EDAL)
@@ -389,6 +413,7 @@ plot(EDALvx)
 ```
 
 ###Cook's distance
+
 ```{r}
 ols_plot_cooksd_bar(EDAL)
 ols_plot_cooksd_bar(EDAL1)
@@ -396,53 +421,7 @@ ols_plot_cooksd_bar(EDALv)
 ols_plot_cooksd_bar(EDALvx)
 ```
 
-Second analysis
-```{r results='asis'}
-library(stargazer)
-stargazer(EDAL, EDAL1, EDALv, EDALvx, type="html", dep.var.caption  = "Clark&Golder 2006 pooled analysis replication",  column.labels = c("1946 to 2000 ED","1946 to 2000 ED (reduced sample)", "additive model","interactive model", NULL ), se=list(robust_seEDAL ,robust_seEDAL, robust_seEDAL1, robust_seEDALv, robust_seEDALvx)) 
-```
 
-
-###log(ENEP1)
-
-```{r}
-#library(effects)
-#plot(predictorEffect("eneg", poolED))
-
-#jtools::effect_plot(poolED, pred = eneg, interval = TRUE, plot.points = TRUE)
-
-#margins::margins.plm(poolED)
-```
-
-# Replying Clark&Goler with the new dataset
-In this section I will try to perform a pooled effect with the R5 model, which was the one that fitted better the data, even though it had heteroskedasticity.
-```{r eval=FALSE}
-newdata <- readr::read_csv2(url("https://raw.githubusercontent.com/pgrau7/ES-0/master/Merging%20datasets/FINAL_DATA.csv"))
-newdata$EthAl <- as.numeric(newdata$EthAl)
-pdata <- pdata.frame(newdata, index = c("country","date.x"))
-pdata$logmag <- log(pdata$memag)
-pdata$logmag_ethal <- pdata$logmag*pdata$EthAl
-pdata$uppertier_ethal <- pdata$uppertier*pdata$EthAl
-
-
-#poolEDAL <- plm(log(enep1)~EthAl+log(memag)+uppertier+log(memag)*EthAl+uppertier*EthAl, data=subset(data, old==1), index=c("country", "year"), model="pooling")
-poolEDAL<- plm(log(enep1)~EthAl+logmag+uppertier+logmag_ethal+uppertier_ethal, data=subset(data, old==1), index=c("country"), model="pooling")
-robust_seEDAL <- sqrt(diag(vcovCR(poolEDAL, type = "HC1", cluster = "country")))
-
-poolEDAL1 <- plm(log(enep1)~EthAl+logmag+uppertier+enpres+proximity1+logmag_ethal+uppertier_ethal+proximity1_enpres, data=subset(data, old==1&!is.na(data$varmag)), index=c("country", "year"), model="pooling")
-robust_seEDAL1 <- sqrt(diag(vcovHC(poolEDAL1, type = "HC1")))
-
-poolEDALv <- plm(log(enep1)~EthAl+logmag+uppertier+enpres+proximity1+logmag_ethal+uppertier_ethal+proximity1_enpres+varmag, data=subset(data, old==1), index=c("country", "year"), model="pooling")
-robust_seEDALv <- sqrt(diag(vcovHC(poolEDALv, type = "HC1")))
-
-poolEDALvx <- plm(log(enep1)~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+varmag+varmag*logmag, data=subset(pdata, old==1), index=c("country", "year"), model="pooling")
-robust_seEDALvx <- sqrt(diag(vcovHC(poolEDALvx, type = "HC1")))
-
-xR5 <- plm(log(enep1)~EthAl+logmag+uppertier+logmag_ethal+uppertier_ethal+(log1p(varmag)*log1p(memag)), data=pdata, index=c("country", "date.x"), model="pooling", pooling=TRUE)
-robust_seR5pooled1 <- sqrt(diag(vcovHC(xR5, type = "HC1")))
-
-R5 <- lm(log(enep1)~EthAl+logmag+uppertier+logmag_ethal+uppertier_ethal+(log1p(varmag)*log1p(memag)), data=pdata)
-```
 ##Reproduce C&G2006 Marginal Effect Plot
 The marginal effect of temporally proximate presidential elections on the effective number of electoral parties.
 ```{r}
@@ -451,12 +430,8 @@ data <- read_dta("https://github.com/pgrau7/ES-0/blob/master/Creating%20the%20fi
 ```
 
 
-Load meplot function (Williams, M.)^[https://rstudio-pubs-static.s3.amazonaws.com/381372_361cdae2b43f4365aeee13a2663b1dee.html]. I've modified this line in order to include the clustering: (  cov <- vcovPL(model, cluster = ~country+year, type="HC1"))
-:
-```{r}
+Load meplot function (Williams, M.)^[https://rstudio-pubs-static.s3.amazonaws.com/381372_361cdae2b43f4365aeee13a2663b1dee.html] and run it. 
 
-```
-robust_seWS <- sqrt(diag(vcovHC(poolWS, type = "HC1")))
 ```{r results='asis'}
 library(plm)
 library(sandwich)
@@ -464,15 +439,18 @@ library(sandwich)
 CS1 <- lm(enep1~eneg+logmag+uppertier+enpres+proximity1+logmag*eneg+uppertier*eneg+proximity1*enpres, data=data)
 robust_CS1 <- sqrt(diag(vcovPL(CS1, cluster = ~country+year, type="HC1")))
 
-stargazer::stargazer(poolWS, CS1, dep.var.caption  = "plm vs. vcovPL manual",  column.labels = c("plm", "lm with vcovPL"), se=list(robust_seWS, robust_CS1), type="text") 
+stargazer::stargazer(poolWS, CS1, dep.var.caption  = "plm vs. vcovPL manual",  column.labels = c("plm", "lm with vcovPL"), se=list(robust_seWS, robust_CS1), type="html") 
 
 ```
 
 
 
 #Marginal effect of interactive terms
+
 ##Replying Clark&Golder 2006
+
 ###Figure 1: The Marginal Effect of Ethnic Heterogeneity on the Effective Number of Electoral Parties
+
 ```{r}
 library(sandwich)
 
@@ -495,21 +473,22 @@ meplot(model=CS1,var1="eneg",var2="logmag", int="eneg:logmag", vcov = vcovHC(CS1
 ##Conclusion: It doesn't seem to be exactly the same graph (even though the coefficients are the same). I think it must have to be related with the use of STATA or R. https://blog.theleapjournal.org/2016/06/sophisticated-clustered-standard-errors.html
   
 ```
+
 It isn't the same graph as CG2006, but the variance-covariance is it. The function seems correct. 
-```{r}
-library(plm)
-poolEDALvx <- plm(enep1~EthAl+logmag+uppertier+enpres+proximity1+logmag*EthAl+uppertier*EthAl+proximity1*enpres+varmag+varmag*logmag, data=subset(data, old==1&!is.na(data$varmag)), index=c("country"), model="pooling")
-robust_seEDALvx <- sqrt(diag(vcovHC(poolEDALvx, type = "HC1")))
 
-meplotbasic(model=poolEDALvx,var1="varmag",var2="logmag")
-meplot(model=poolEDALvx,var1="varmag",var2="logmag", int="varmag:logmag", vcov = vcovHC(poolEDALvx, type = "HC1"))
-
-
+```{r }
 par(family="serif",bty="l",mar=c(5,5.5,2,2))
 meplotbasic(model=poolEDALvx,var1="varmag",var2="logmag",xlab = "Average District Magnitude (log)", ci=.95,
      ylab = expression(frac(partialdiff*paste("Variance"),
                             partialdiff*paste("ENEP"))),
-     main="Marginal Effect of Variance on ENEP as Average Magnitude (log) varies",
+     main="Marginal Effect of Variance on ENEP as Magnitude (log) varies (CI 95%)",
+     ci_lty=3,yint_lty=1,yint_col="grey")
+
+par(family="serif",bty="l",mar=c(5,5.5,2,2))
+meplotbasic(model=poolEDALvx,var1="varmag",var2="logmag",xlab = "Average District Magnitude (log)", ci=.90,
+     ylab = expression(frac(partialdiff*paste("Variance"),
+                            partialdiff*paste("ENEP"))),
+     main="Marginal Effect of Variance on ENEP as Magnitude (log) varies (CI 90%)",
      ci_lty=3,yint_lty=1,yint_col="grey")
 
 ```
