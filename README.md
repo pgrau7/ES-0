@@ -7,7 +7,7 @@ This repository includes all the necessary material for replicating the paper "T
 
 2. **Statistical Analyis** : provides the analyses performed for the paper. It includes a "html" document that can be downloaded and opened with any Internet browser, as well as the "Rmd" file, which can be opened with RStudio (https://rstudio.com/) and from which all the analyses can be replicated.
 
-
+3. **Merging datasets** : provides a dataset (FINAL_DATA1.CSV) including Bormann & Golder (2013), the fragmentation measure from Alesina et al. (2003) and variance from Kollman et al. (2019). Even though it has been not used in the paper, it might be useful for further studies. 
 
 
 ## References
